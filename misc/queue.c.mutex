@@ -1,0 +1,145 @@
+/*
+ * queue.c
+ *
+ *  Created on: Nov 28, 2017
+ *      Author: lichen
+ */
+
+#include "queue.h"
+
+#define MIN(a,b) (((a)<(b))?(a):(b))
+
+struct queue *q = (struct queue *) 0;
+
+int queue_init(int size)
+{
+  q = (struct queue *) calloc(1, sizeof(struct queue));
+  if (!q) {
+    printf("QueueInit Failed!!!\n");
+    return false;
+  }
+
+  q->memPerSize = size;
+  q->memStroage = (uint8_t *) calloc(QUEUE_SIZE, size);
+  if (!q->memStroage) {
+    free(q);
+    printf("QueueInit Failed!!!\n");
+    return false;
+  }
+
+  int i;
+  uint8_t *p;
+
+  for (i = 0, p = q->memStroage; i < QUEUE_SIZE; i++, p += size) {
+    q->memArray[i].buf = p;
+  }
+
+  return true;
+}
+
+int queue_deinit(void)
+{
+  if (q) {
+    if (q->memStroage) {
+      free(q->memStroage);
+      q->memStroage = NULL;
+    }
+    free(q);
+    q = NULL;
+  }
+}
+
+int queue_full(void)
+{
+  return ((1 + q->tail) % QUEUE_SIZE == q->head) ? 1:0;
+}
+
+int queue_send(uint8_t *data, int dataLen)
+{
+  pthread_mutex_lock(&q->lock);
+
+  int tmp = q->tail;
+  if (++tmp >= QUEUE_SIZE) {
+    tmp = 0;
+  }
+  if (tmp == q->head) {
+    pthread_mutex_unlock(&q->lock);
+    printf("Queue Buffer Full!\n");
+    return 0;
+  }
+
+  int len = MIN(dataLen, q->memPerSize);
+  memcpy(q->memArray[q->tail].buf, data, len);
+  q->memArray[q->tail].bufLen = len;
+
+  if (++q->tail >= QUEUE_SIZE) {
+    q->tail = 0;
+  }
+
+  pthread_mutex_unlock(&q->lock);
+  return true;
+}
+
+int queue_recv(uint8_t *buf, int bufLen)
+{
+  pthread_mutex_lock(&q->lock);
+  if (q->head == q->tail) {
+    pthread_mutex_unlock(&q->lock);
+//    printf("Queue Buffer Empty!\n");
+    return 0;
+  }
+
+  int len = MIN(bufLen, q->memArray[q->head].bufLen);
+  memcpy(buf, q->memArray[q->head].buf, len);
+
+  if (++q->head >= QUEUE_SIZE) {
+    q->head = 0;
+  }
+  pthread_mutex_unlock(&q->lock);
+
+  return len;
+}
+
+//HI_S32 HisiPutH264DataToBuffer(VENC_STREAM_S *pstStream)
+HI_S32 iotQueue_PutData(VENC_STREAM_S *pstStream)
+{
+  int len = 0;
+  uint8_t *buf = NULL;
+  int i, off;
+
+  pthread_mutex_lock(&q->lock);
+
+  int tmp = q->tail;
+  if (++tmp >= QUEUE_SIZE) {
+    tmp = 0;
+  }
+  if (tmp == q->head) {
+    pthread_mutex_unlock(&q->lock);
+    printf("Queue Buffer Full!\n");
+    return 0;
+  }
+
+  for (i = 0; i < pstStream->u32PackCount; i++) {
+    len += pstStream->pstPack[i].u32Len-pstStream->pstPack[i].u32Offset;
+  }
+  if (len > q->memPerSize) {
+    printf("Queue the data is too long: %d!!!\n", len);
+    len = q->memPerSize;
+    while (1);
+  }
+
+  q->memArray[q->tail].bufLen = len;
+  buf = q->memArray[q->tail].buf;
+
+  for (i = 0, off = 0; i < pstStream->u32PackCount; i++) {
+    memcpy(buf + off, pstStream->pstPack[i].pu8Addr+pstStream->pstPack[i].u32Offset, pstStream->pstPack[i].u32Len-pstStream->pstPack[i].u32Offset);
+    off += pstStream->pstPack[i].u32Len-pstStream->pstPack[i].u32Offset;
+  }
+
+  if (++q->tail >= QUEUE_SIZE) {
+    q->tail = 0;
+  }
+
+  pthread_mutex_unlock(&q->lock);
+  return 0;
+}
