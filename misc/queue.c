@@ -54,6 +54,18 @@ int queue_full(void)
   return ((1 + q->tail) % QUEUE_SIZE == q->head) ? 1:0;
 }
 
+int queue_empty(void)
+{
+  return (q->head == q->tail) ? 1:0;
+}
+
+void queue_flush(void)
+{
+  while(q->head != q->tail) {
+    q->head = (++q->head) % QUEUE_SIZE;
+  }
+}
+
 int queue_send(uint8_t *data, int dataLen)
 {
   if ((1 + q->tail) % QUEUE_SIZE == q->head) {

@@ -707,8 +707,8 @@ void SAMPLE_VENC_1080P_CLASSIC_STOP(HI_VOID)
 void* SAMPLE_VENC_1080P_CLASSIC(HI_VOID *arg)
 {
 
-int mode = * ((int*)arg);
-printf("VENC mode = %d\n", mode);
+  int mode = * ((int*)arg);
+  int mode = 0;
 
 PAYLOAD_TYPE_E enPayLoad[3]= {PT_H264, PT_H264,PT_H264};
 PIC_SIZE_E enSize[1];

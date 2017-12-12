@@ -1383,6 +1383,17 @@ WriteN(RTMP *r, const char *buffer, int n)
 	  if (sockerr == EINTR && !RTMP_ctrlC)
 	    continue;
 
+/* lichen add: Bug
+ * RTMP_Close() exit application in hisiv300
+ * WriteN call RTMP_Close call SendFCUnpublish call RTMP_SendPacket call WriteN
+ * SIGPIPE signal stop application, if ignore SIGPIPE, WriteN will recursion itself
+ * in final, malloc will empty the memory
+ */
+	  if (sockerr == ECONNRESET) {
+      r->m_stream_id = 0;
+	  }
+
+
 	  RTMP_Close(r);
 	  n = 1;
 	  break;
@@ -1711,7 +1722,7 @@ SendFCUnpublish(RTMP *r)
 
   packet.m_nBodySize = enc - packet.m_body;
 
-  return RTMP_SendPacket(r, &packet, FALSE);
+  return RTMP_SendPacket(r, &packet, FALSE);;
 }
 
 SAVC(publish);
@@ -3385,20 +3396,21 @@ RTMP_Close(RTMP *r)
   if (RTMP_IsConnected(r))
     {
       if (r->m_stream_id > 0)
-        {
-          if ((r->Link.protocol & RTMP_FEATURE_WRITE))
-	    SendFCUnpublish(r);
-	  i = r->m_stream_id;
-	  r->m_stream_id = 0;
-	  SendDeleteStream(r, i);
-	}
-      if (r->m_clientID.av_val)
-        {
-	  HTTP_Post(r, RTMPT_CLOSE, "", 1);
-	  free(r->m_clientID.av_val);
-	  r->m_clientID.av_val = NULL;
-	  r->m_clientID.av_len = 0;
-	}
+      {
+        if ((r->Link.protocol & RTMP_FEATURE_WRITE)) {
+          SendFCUnpublish(r);
+        }
+        i = r->m_stream_id;
+        r->m_stream_id = 0;
+        SendDeleteStream(r, i);
+      }
+    if (r->m_clientID.av_val)
+      {
+        HTTP_Post(r, RTMPT_CLOSE, "", 1);
+        free(r->m_clientID.av_val);
+        r->m_clientID.av_val = NULL;
+        r->m_clientID.av_len = 0;
+      }
       RTMPSockBuf_Close(&r->m_sb);
     }
 

@@ -47,7 +47,7 @@ void SAMPLE_VENC_Usage(char *sPrgNm)
 
 #include <semaphore.h>
 static sem_t sem;
-unsigned int vencMode;
+int vencMode;
 
 void SAMPLE_VENC_1080P_CLASSIC_STOP(HI_VOID)
 {
@@ -57,7 +57,7 @@ void SAMPLE_VENC_1080P_CLASSIC_STOP(HI_VOID)
 //HI_S32 SAMPLE_VENC_1080P_CLASSIC(HI_VOID)
 void* SAMPLE_VENC_1080P_CLASSIC(HI_VOID *arg)
 {
-  vencMode = * ((unsigned int*)arg);
+  vencMode = * ((int*)arg);
 
   if (vencMode > 2) {
     printf("Invalied vencMode: %d !!!\n", vencMode);
@@ -95,7 +95,6 @@ void* SAMPLE_VENC_1080P_CLASSIC(HI_VOID *arg)
     
 	SAMPLE_COMM_VI_GetSizeBySensor(&enSize[0]);
 
-printf("PIC_TYPE: %d\n", enSize[0]);
 
     if (PIC_HD1080 == enSize[0])
     {

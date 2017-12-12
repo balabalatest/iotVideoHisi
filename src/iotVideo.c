@@ -17,7 +17,7 @@
 #define USE_QUEUE
 //#define USE_FIFO
 
-#define QUEUE_BUFSIZE  (128*1024)
+//#define QUEUE_BUFSIZE  (128*1024)
 
 #ifdef USE_QUEUE
 #include "queue.h"
@@ -79,6 +79,19 @@ void getopts(int argc, char** argv)
   }
 }
 
+int mainRunning = 0;
+
+static void HandleSig(HI_S32 signo)
+{
+    if (SIGINT == signo || SIGTERM == signo)
+    {
+      mainRunning = 0;
+      printf("\033[0;31mprogram termination abnormally!\033[0;39m\n");
+    }
+    if (SIGPIPE == signo) {
+      printf("\033[0;31mSIGPIPE! Server maybe closed!!!\033[0;39m\n");
+    }
+}
 
 int main(int argc, char **argv)
 {
@@ -96,7 +109,18 @@ int main(int argc, char **argv)
   }
 #endif
 
-  while (iotMqtt_isConnect()) {
+  mainRunning = 0;
+  signal(SIGINT, HandleSig);
+  signal(SIGTERM, HandleSig);
+  signal(SIGPIPE, HandleSig);
+  mainRunning = 1;
+
+  while (1) {
+
+    if (!iotMqtt_isConnect())
+      mainRunning = 0;
+    if (mainRunning == 0)
+      break;
 
     uint8_t cmdbuf[256] = {0};
     int cmdid = func_MqttGetCmd(cmdbuf);
@@ -110,7 +134,13 @@ int main(int argc, char **argv)
 //    usleep(1);
   }
 
-  return 0;
+  func_RtmpScheduleStop();
+
+  iotMqtt_Disconnect();
+
+  printf("System Exit...!!!\n");
+
+  exit(0);
 }
 
 #if 0

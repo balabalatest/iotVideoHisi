@@ -9,7 +9,7 @@ int iotRtmp_Connect(const char *url, int timeout)
 {
   if (!url) return FALSE;
 
-//  RTMP_LogSetLevel(RTMP_LOGWARNING);
+//  RTMP_LogSetLevel(RTMP_LOGDEBUG);
 
   rtmp = RTMP_Alloc();
   if (!rtmp) return FALSE;
@@ -59,7 +59,7 @@ int iotRtmp_SendPacket(unsigned char *buf, int bufLen, int type, uint32_t ts)
 {
   int rc = FALSE;
 
-    RTMPPacket sPacket, *packet = &sPacket;
+  RTMPPacket sPacket, *packet = &sPacket;
   RTMPPacket_Reset(packet);
   if (!RTMPPacket_Alloc(packet, bufLen))
     return rc;
@@ -167,9 +167,9 @@ int iotRtmp_SendSpsPps(unsigned char *sps, int spsLen, unsigned char *pps, int p
   int pLen = spsLen + ppsLen + 32;
 
     RTMPPacket sPacket, *packet = &sPacket;
-  RTMPPacket_Reset(packet);
-  if (!RTMPPacket_Alloc(packet, pLen))
-    return rc;
+    RTMPPacket_Reset(packet);
+    if (!RTMPPacket_Alloc(packet, pLen))
+      return rc;
 
     int i = 0;
     unsigned char *body = (unsigned char *)packet->m_body;
@@ -305,18 +305,24 @@ int iotRtmp_SendH264Packet(uint8_t *data, int dataLen, uint32_t ts)
         break;
       }
 
-      iotRtmp_SendSpsPps(sps, spsLen, pps, ppsLen);
+      rc = iotRtmp_SendSpsPps(sps, spsLen, pps, ppsLen);
+      if (rc == FALSE) break;
 
     /* key frame, eg: I frame */
     } else if (*nal == 0x65) {
       if (sps && pps)
-        iotRtmp_SendSpsPps(sps, spsLen, pps, ppsLen);
-      iotRtmp_SendH264Frame(nal, nalLen, TRUE, ts);
+        rc = iotRtmp_SendSpsPps(sps, spsLen, pps, ppsLen);
+        if (rc == FALSE) break;
+
+        rc = iotRtmp_SendH264Frame(nal, nalLen, TRUE, ts);
+        if (rc == FALSE) break;
 
     } else {
-      iotRtmp_SendH264Frame(nal, nalLen, FALSE, ts);
+      rc = iotRtmp_SendH264Frame(nal, nalLen, FALSE, ts);
+      if (rc == FALSE) break;
     }
   }
+
   return rc;
 }
 

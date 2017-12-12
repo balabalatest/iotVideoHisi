@@ -31,7 +31,7 @@ int func_MqttGetCmd(uint8_t cmdbuf[])
         cJSON *jcmd   = cJSON_GetObjectItem(json, "cmd");
 
         if (jcmdid && jcmd) {
-printf("Platform cmdid: %d\n", jcmdid->valueint);
+          //printf("Platform cmdid: %d\n", jcmdid->valueint);
           switch (jcmdid->valueint) {
 
           case 1: {
@@ -64,21 +64,29 @@ printf("Platform cmdid: %d\n", jcmdid->valueint);
 }
 
 
-
 int g_rtmpState = 0;
+static pthread_t pid;
 
-#define QUEUE_BUFSIZE  (128*1024)
-
+#define QUEUE_BUFSIZE  (160*1024)
 extern void SAMPLE_VENC_1080P_CLASSIC(void *arg);
 uint8_t bufRecv[QUEUE_BUFSIZE] = {0};
 uint8_t bufSend[QUEUE_BUFSIZE] = {0};
 
+
+int func_RtmpScheduleStop(void)
+{
+  SAMPLE_VENC_1080P_CLASSIC_STOP();
+  pthread_join(pid, 0);
+  iotRtmp_Disconnect();
+  queue_deinit();
+  g_rtmpState = 0;
+}
+
 int func_RtmpSchedule(int cmdid, uint8_t cmdbuf[])
 {
   int rc = 0;
-  unsigned int mode = 0;
-  pthread_t pid;
   uint32_t rtmpTime;
+  static int mode = 0;
 
   switch (g_rtmpState) {
 
@@ -102,7 +110,12 @@ int func_RtmpSchedule(int cmdid, uint8_t cmdbuf[])
     } else if (mode == 2) {
       width = 320; height = 240;
     }
-    iotRtmp_SendMetadata(width, height, framerate);
+    rc = iotRtmp_SendMetadata(width, height, framerate);
+    if (rc == FALSE) {
+      printf("iotRtmp_SendMetadata failed!!!\n");
+    }
+    if (!queue_empty())
+      queue_flush();
 
     pthread_create(&pid, NULL, SAMPLE_VENC_1080P_CLASSIC, (void*)&mode);
 
@@ -118,9 +131,12 @@ int func_RtmpSchedule(int cmdid, uint8_t cmdbuf[])
 
       int len = queue_recv(bufRecv, QUEUE_BUFSIZE);
       if (len) {
-        iotRtmp_SendH264Packet(bufRecv, len, RTMP_GetTime()-rtmpTime);
+        rc = iotRtmp_SendH264Packet(bufRecv, len, RTMP_GetTime()-rtmpTime);
+        if (rc == FALSE) {
+          printf("iotRtmp_SendH264Packet failed!!!\n");
+          g_rtmpState = 3;
+        }
       }
-
     } else if (cmdid == 1) {
 
       /* TODO */
@@ -128,10 +144,8 @@ int func_RtmpSchedule(int cmdid, uint8_t cmdbuf[])
 
     } else if (cmdid == 6) {
 
-#if 0
+#if 1
       int level = cmdbuf[0] - '0';
-      printf("Level: %d", level);
-
       if (level == 1) mode = 2;
       else if (level == 2) mode = 1;
       else if (level >= 3) mode = 0;
@@ -146,8 +160,12 @@ int func_RtmpSchedule(int cmdid, uint8_t cmdbuf[])
 
   /* disconnect */
   case 3: {
-    queue_deinit();
+
+    SAMPLE_VENC_1080P_CLASSIC_STOP();
+    pthread_join(pid, 0);
+
     iotRtmp_Disconnect();
+    queue_deinit();
     g_rtmpState = 0;
   } break;
 

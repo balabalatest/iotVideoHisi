@@ -9,7 +9,7 @@
 #define QUEUE_H_
 
 
-#define QUEUE_SIZE  32
+#define QUEUE_SIZE  24
 
 #include <stdint.h>
 #include <stdbool.h>
@@ -32,6 +32,9 @@ struct queue {
 };
 
 int queue_full(void);
+int queue_empty(void);
+void queue_flush(void);
+
 int queue_init(int size);
 int queue_deinit(void);
 int queue_send(uint8_t *data, int dataLen);
