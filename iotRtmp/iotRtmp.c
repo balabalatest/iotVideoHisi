@@ -5,6 +5,11 @@
 
 static RTMP* rtmp = NULL;
 
+static uint8_t sps[64] = {0};  /* 13Bytes */
+static uint8_t pps[64] = {0};  /* 4Bytes */
+static uint32_t spsLen = 0, ppsLen = 0;
+
+
 int iotRtmp_Connect(const char *url, int timeout)
 {
   if (!url) return FALSE;
@@ -84,7 +89,7 @@ int iotRtmp_SendPacket(unsigned char *buf, int bufLen, int type, uint32_t ts)
   return rc;
 }
 
-int iotRtmp_SendMetadata(int width, int height, int framerate)
+int iotRtmp_SendMetadata(int width, int height, int framerate, int bitrate)
 {
 const int PACKET_SIZE  = 512;
 const int VIDEOCODECID = 7;
@@ -106,7 +111,6 @@ const int VIDEOCODECID = 7;
 
   memset(&obj, 0, sizeof(obj));
   AMF_Reset(&obj);
-
 
   avValue.av_val = "@setDataFrame";
   avValue.av_len = strlen(avValue.av_val);
@@ -134,7 +138,7 @@ const int VIDEOCODECID = 7;
   avValue.av_len = strlen(avValue.av_val);
   AMFProp_SetName(&prop, &avValue);
   prop.p_type = AMF_NUMBER;
-  prop.p_vu.p_number = framerate;
+  prop.p_vu.p_number = (double)framerate;
   AMF_AddProp(&obj, &prop);
 
   avValue.av_val = "videocodecid";
@@ -143,6 +147,21 @@ const int VIDEOCODECID = 7;
   prop.p_type = AMF_NUMBER;
   prop.p_vu.p_number = VIDEOCODECID;
   AMF_AddProp(&obj, &prop);
+
+  avValue.av_val = "videorate";
+  avValue.av_len = strlen(avValue.av_val);
+  AMFProp_SetName(&prop, &avValue);
+  prop.p_type = AMF_NUMBER;
+  prop.p_vu.p_number = ((double)bitrate) / 1000;
+  AMF_AddProp(&obj, &prop);
+
+  avValue.av_val = "duration";
+  avValue.av_len = strlen(avValue.av_val);
+  AMFProp_SetName(&prop, &avValue);
+  prop.p_type = AMF_NUMBER;
+  prop.p_vu.p_number = 0;
+  AMF_AddProp(&obj, &prop);
+
 
   p = AMF_Encode(&obj, p, pend);
 
@@ -161,7 +180,7 @@ const int VIDEOCODECID = 7;
   return rc;
 }
 
-int iotRtmp_SendSpsPps(unsigned char *sps, int spsLen, unsigned char *pps, int ppsLen)
+int iotRtmp_SendSpsPps(unsigned char *sps, int spsLen, unsigned char *pps, int ppsLen, uint32_t ts)
 {
   int rc = FALSE;
   int pLen = spsLen + ppsLen + 32;
@@ -204,7 +223,7 @@ int iotRtmp_SendSpsPps(unsigned char *sps, int spsLen, unsigned char *pps, int p
     packet->m_nBodySize       = i;
     packet->m_nInfoField2     = rtmp->m_stream_id;
     packet->m_nChannel        = 0x04;
-    packet->m_nTimeStamp      = 0;
+    packet->m_nTimeStamp      = ts;
     packet->m_hasAbsTimestamp = 0;
     packet->m_packetType      = RTMP_PACKET_TYPE_VIDEO;
     packet->m_headerType      = RTMP_PACKET_SIZE_MEDIUM;
@@ -243,7 +262,6 @@ int iotRtmp_SendH264Frame(unsigned char *data, unsigned int size, int isKeyframe
     body[i++] = (uint8_t)  size;
     // NALU data
     memcpy(&body[i], data, size);
-// iotRtmp_SendSpsPps(metaData.sps, metaData.spsLen, metaData.pps, metaData.ppsLen);
 
   } else {
     body[i++] = 0x27;  // 2:Pframe  7:AVC
@@ -260,6 +278,7 @@ int iotRtmp_SendH264Frame(unsigned char *data, unsigned int size, int isKeyframe
     memcpy(&body[i], data, size);
   }
 
+//printf("H246 %s Send, size = %d\n", isKeyframe ? "key-frame": "inter-frame", size);
   rc = iotRtmp_SendPacket(body, i+size, RTMP_PACKET_TYPE_VIDEO, ts);
 
   free(body);
@@ -269,7 +288,7 @@ int iotRtmp_SendH264Frame(unsigned char *data, unsigned int size, int isKeyframe
 
 
 static uint32_t find_start_code(uint8_t *buf, uint32_t zeros_in_startcode);
-static uint8_t * get_nal(uint32_t *len, uint8_t **offset, uint8_t *start, uint32_t total);
+static uint8_t *get_nal(uint32_t *len, uint8_t **offset, uint8_t *start, uint32_t total);
 
 int iotRtmp_SendH264Packet(uint8_t *data, int dataLen, uint32_t ts)
 {
@@ -283,10 +302,8 @@ int iotRtmp_SendH264Packet(uint8_t *data, int dataLen, uint32_t ts)
   uint8_t *bufOffset = data;
   uint32_t bufLen = dataLen;
 
-  uint8_t *sps = NULL, *pps = NULL;
-  uint32_t spsLen, ppsLen;
-
   while (1) {
+
     uint32_t nalLen;
     uint8_t *nal = get_nal(&nalLen, &bufOffset, buf, bufLen);
 
@@ -294,9 +311,9 @@ int iotRtmp_SendH264Packet(uint8_t *data, int dataLen, uint32_t ts)
       rc = TRUE;
       break;
     }
-
     /* sps & pps */
-    if (*nal == 0x67) {
+    if (nal[0] == 0x67) {
+#if 0
       sps = nal;
       spsLen = nalLen;
       pps = get_nal(&ppsLen, &bufOffset, buf, bufLen);
@@ -305,18 +322,34 @@ int iotRtmp_SendH264Packet(uint8_t *data, int dataLen, uint32_t ts)
         break;
       }
 
-      rc = iotRtmp_SendSpsPps(sps, spsLen, pps, ppsLen);
+      rc = iotRtmp_SendSpsPps(sps, spsLen, pps, ppsLen, ts);
       if (rc == FALSE) break;
+#else
+      memcpy(sps, nal, nalLen);
+      spsLen = nalLen;
+      nal = get_nal(&nalLen, &bufOffset, buf, bufLen);
+      if (nal[0] != 0x68) {
+        printf("pps not after sps ...\n");
+        return FALSE;
+      }
+      memcpy(pps, nal, nalLen);
+      ppsLen = nalLen;
+//printf("sps&pps frame!\n");
+//  1 seconds interval
+#endif
 
     /* key frame, eg: I frame */
-    } else if (*nal == 0x65) {
-      if (sps && pps)
-        rc = iotRtmp_SendSpsPps(sps, spsLen, pps, ppsLen);
-        if (rc == FALSE) break;
-
-        rc = iotRtmp_SendH264Frame(nal, nalLen, TRUE, ts);
-        if (rc == FALSE) break;
-
+    } else if (nal[0] == 0x65) {
+#if 0
+      rc = iotRtmp_SendSpsPps(sps, spsLen, pps, ppsLen, ts);
+      if (rc == FALSE) break;
+#endif
+//printf("key-frame!\n");
+//  1 seconds interval
+      rc = iotRtmp_SendH264Frame(nal, nalLen, TRUE, ts);
+      if (rc == FALSE) break;
+    } else if (nal[0] == 0x06) {
+//printf("SEI after sps&pps!\n");
     } else {
       rc = iotRtmp_SendH264Frame(nal, nalLen, FALSE, ts);
       if (rc == FALSE) break;
@@ -326,6 +359,70 @@ int iotRtmp_SendH264Packet(uint8_t *data, int dataLen, uint32_t ts)
   return rc;
 }
 
+int iotRtmp_SendFirstFrame(uint8_t *data, int dataLen, uint32_t ts)
+{
+  int rc = FALSE;
+
+  if ((data == NULL) || (rtmp == NULL))
+      return rc;
+
+  uint8_t *buf = data;
+  uint8_t *bufOffset = data;
+  uint32_t bufLen = dataLen;
+
+  int state = 0;
+  while (1) {
+
+    uint32_t nalLen;
+    uint8_t *nal = get_nal(&nalLen, &bufOffset, buf, bufLen);
+    if (nal == NULL) {
+      if (state == 3) return TRUE;
+      printf("None valid date in nal !!!\n");
+      return FALSE;
+    }
+
+    switch (state) {
+    case 0:
+      if (nal[0] == 0x67) {
+        memcpy(sps, nal, nalLen);
+        spsLen = nalLen;
+        state = 1;
+      }
+    break;
+    case 1:
+      if (nal[0] == 0x68) {
+        memcpy(pps, nal, nalLen);
+        ppsLen = nalLen;
+        state = 2;
+      } else {
+        printf("pps not after sps 1st!!!\n");
+        state = 0;
+      }
+    break;
+    case 2:
+      if (nal[0] == 0x65) {
+        rc = iotRtmp_SendSpsPps(sps, spsLen, pps, ppsLen, ts);
+        if (rc == FALSE) return -1;
+        rc = iotRtmp_SendH264Frame(nal, nalLen, TRUE, ts);
+        if (rc == FALSE) return -1;
+        state = 3;
+      } else if (nal[0] == 0x06) {
+        /* SEI, ignore */
+//printf("SEI after sps&pps!\n");
+      } else {
+        printf("Invalid type after sps&pps, Type: 0x%02x!!!\n", nal[0]);
+        state = 0;
+      }
+    break;
+    case 3:
+      rc = iotRtmp_SendH264Frame(nal, nalLen, (nal[0] == 0x65), ts);
+      if (rc == FALSE) return -1;
+    break;
+    }
+  }
+
+  return rc;
+}
 
 static uint32_t find_start_code(uint8_t *buf, uint32_t zeros_in_startcode)
 {

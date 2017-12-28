@@ -24,8 +24,8 @@ typedef struct {
 
 struct queue {
   pthread_mutex_t lock;
-  int head;
-  int tail;
+  volatile int head;
+  volatile int tail;
   mem_t memArray[QUEUE_SIZE];
   uint8_t *memStroage;
   int memPerSize;

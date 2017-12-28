@@ -33,9 +33,9 @@ struct ringbuf ringinfo;
 static struct deviceInfo device =
 {
   .cameraName = "hisi",
-  .clientid = "20414699",
-  .username = "86338",
-  .password = "cameraAuth",
+  .clientid = "20444004",
+  .username = "104564",
+  .password = "cameraDeviceAuth",
 };
 
 void usage()
@@ -104,7 +104,6 @@ int main(int argc, char **argv)
   rc = iotMqtt_StartTask(&device);
   if (rc != SUCCESS) {
     printf("iotMqtt_StartTask() Failed!!!\n");
-    sleep(1);
     exit(-1);
   }
 #endif
@@ -115,11 +114,9 @@ int main(int argc, char **argv)
   signal(SIGPIPE, HandleSig);
   mainRunning = 1;
 
-  while (1) {
+  while (mainRunning) {
 
     if (!iotMqtt_isConnect())
-      mainRunning = 0;
-    if (mainRunning == 0)
       break;
 
     uint8_t cmdbuf[256] = {0};
@@ -142,6 +139,102 @@ int main(int argc, char **argv)
 
   exit(0);
 }
+
+#define QUEUE_BUFSIZE  (160*1024)
+static uint8_t bufRecv[QUEUE_BUFSIZE];
+extern void* SAMPLE_VENC_1080P_CLASSIC(HI_VOID *arg);
+
+int main0(int argc, char *argv[])
+{
+  static pthread_t id;
+
+  static int mode = 2;
+
+  int width, height, framerate = 30, bitrate = 2048;
+  if (mode == 0) {
+    width = 1280; height = 720;
+  } else if (mode == 1) {
+    width = 640; height = 480;
+  } else if (mode == 2) {
+    width = 320; height = 240; bitrate = 512;
+  }
+
+
+  char url[100];
+  if(argc!=2)
+  {
+    printf("Usage: %s URL\n", argv[0]);
+    return -1;
+  }
+  sprintf(url, "rtmp://%s/live/stream",argv[1]);
+  printf("Server: %s\n",url);
+
+  if (!queue_init(QUEUE_BUFSIZE)) {
+    printf("queue init failed!!!\n");
+  }
+  int rc = iotRtmp_Connect(url, 10);
+  if (!rc) {
+    printf("connect %s failed!!!\n",url);
+    return -1;
+  }
+
+  pthread_create(&id,NULL,SAMPLE_VENC_1080P_CLASSIC,(void*)&mode);
+
+
+retry:
+  while (queue_empty()) usleep(33000);
+
+#if 1
+  rc = iotRtmp_SendMetadata(width, height, framerate, bitrate);
+  if (rc == 0) {
+    printf("iotRtmp_SendMetadata failed!!!\n");
+  }
+#endif
+
+  uint32_t ts = 0;
+
+  int len = queue_recv(bufRecv, QUEUE_BUFSIZE);
+  if (len) {
+
+    ts = RTMP_GetTime();
+    rc = iotRtmp_SendFirstFrame(bufRecv, len, 0);
+    if (rc == 0)
+      goto retry;
+    if (rc == -1) {
+      printf("iotRtmp_SendFirstFrame failed!!!\n");
+      while(1);
+    } else if (rc > 0) {
+      printf("iotRtmp_SendFirstFrame OK!\n");
+    }
+  } else {
+    printf("queue_recv len invalid!!!\n");
+  }
+
+
+  while (1) {
+    int len = queue_recv(bufRecv, QUEUE_BUFSIZE);
+    if (len > 0) {
+
+      uint32_t t1 = RTMP_GetTime();
+
+//      if (!iotRtmp_SendH264Packet(bufRecv, len, ts+=33))  /* will make VLC error: Gray Screen */
+
+      if (!iotRtmp_SendH264Packet(bufRecv, len, RTMP_GetTime() - ts))
+        printf("iotRtmp_SendH264Packet() error!!!\n");
+
+      uint32_t t2 = RTMP_GetTime();
+      if (t2-t1 > 500)
+        printf("Send time: %u\n", t2-t1);
+
+    }
+  }
+
+  queue_deinit();
+  iotRtmp_Disconnect();
+
+  return 0;
+}
+
 
 #if 0
 extern void* SAMPLE_VENC_1080P_CLASSIC(void *arg);
@@ -233,15 +326,16 @@ int main(int argc, char **argv)
 
 int mode = 0;
 int width, height, framerate = 30;
+int bitrate = 2048;
 
         if (mode == 0) {
           width = 1280; height = 720;
         } else if (mode == 1) {
           width = 640; height = 480;
         } else if (mode == 2) {
-          width = 320; height = 240;
+          width = 320; height = 240; bitrate = 512;
         }
-        iotRtmp_SendMetadata(width, height, framerate);
+        iotRtmp_SendMetadata(width, height, framerate, bitrate);
 
 
         rtmpState = 2;
@@ -304,44 +398,5 @@ int width, height, framerate = 30;
   return 0;
 }
 
-
-int main2(int argc, char *argv[])
-{
-  pthread_t id;
-  char url[100];
-  if(argc!=2)
-  {
-    printf("Usage: %s URL\n", argv[0]);
-    return -1;
-  }
-  sprintf(url, "rtmp://%s/live/livestream",argv[1]);
-  printf("Server: %s\n",url);
-
-  int rc = iotRtmp_Connect(url, 10);
-  if (!rc) {
-    printf("connect %s failed!!!\n",url);
-    return -1;
-  }
-
-  pthread_create(&id,NULL,SAMPLE_VENC_1080P_CLASSIC,NULL);
-
-  queue_init(QUEUE_BUFSIZE);
-  uint32_t rtmpTime  = RTMP_GetTime();
-
-  while (1) {
-    uint8_t *buf[QUEUE_BUFSIZE];
-    int len = queue_recv(buf, QUEUE_BUFSIZE);
-    if (len > 0) {
-      if (!iotRtmp_SendH264Packet(buf, len, RTMP_GetTime()-rtmpTime)) {
-        printf("iotRtmp_SendH264Packet() error!!!\n");
-      }
-    }
-  }
-
-  queue_deinit();
-  iotRtmp_Disconnect();
-
-  return 0;
-}
 
 #endif

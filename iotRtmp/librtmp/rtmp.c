@@ -1722,7 +1722,7 @@ SendFCUnpublish(RTMP *r)
 
   packet.m_nBodySize = enc - packet.m_body;
 
-  return RTMP_SendPacket(r, &packet, FALSE);;
+  return RTMP_SendPacket(r, &packet, FALSE);
 }
 
 SAVC(publish);

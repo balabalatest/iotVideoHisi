@@ -286,6 +286,7 @@ void* SAMPLE_VENC_1080P_CLASSIC(HI_VOID *arg)
     /*** HD1080P **/
 
 /* lichen add */
+
 #if 0
     printf("\t c) cbr.\n");
     printf("\t v) vbr.\n");
@@ -373,6 +374,7 @@ void* SAMPLE_VENC_1080P_CLASSIC(HI_VOID *arg)
 	        goto END_VENC_1080P_CLASSIC_5;
 	    }
 	}
+
     /******************************************
      step 6: stream venc process -- get stream, then save it to file. 
     ******************************************/

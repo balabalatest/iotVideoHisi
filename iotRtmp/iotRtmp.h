@@ -18,7 +18,7 @@
 int iotRtmp_Connect(const char *url, int timeout);
 void iotRtmp_Disconnect(void);
 int iotRtmp_SendH264Packet(uint8_t *data, int dataLen, uint32_t ts);
-int iotRtmp_SendMetadata(int width, int height, int framerate);
+int iotRtmp_SendMetadata(int width, int height, int framerate, int bitrate);
 
 
 #endif /* IOTRTMP_H_ */

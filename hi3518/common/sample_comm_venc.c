@@ -1404,6 +1404,19 @@ HI_VOID* SAMPLE_COMM_VENC_GetVencStreamProc(HI_VOID *p)
                    aszFileName[i]);
             return NULL;
         }
+#else
+
+if (0) {
+  printf("VENC_RC_MODE: %d\n", stVencChnAttr.stRcAttr.enRcMode);
+  printf("\tenRcMode is VENC_RC_MODE_H264CBR\n");
+  printf("\tstattime %d\n", stVencChnAttr.stRcAttr.stAttrH264Cbr.u32StatTime);
+  printf("\tbitrate %d\n", stVencChnAttr.stRcAttr.stAttrH264Cbr.u32BitRate);
+  printf("\tgop %d\n", stVencChnAttr.stRcAttr.stAttrH264Cbr.u32Gop);
+  printf("\tframerate %d\n", stVencChnAttr.stRcAttr.stAttrH264Cbr.fr32DstFrmRate);
+}
+
+
+
 #endif
 
         /* Set Venc Fd. */
@@ -1518,7 +1531,10 @@ HI_VOID* SAMPLE_COMM_VENC_GetVencStreamProc(HI_VOID *p)
 extern HI_S32 PUT_DATA(VENC_STREAM_S *pstStream);
 extern int vencMode;
 
+
 if (i == vencMode) {
+//  printf("Capture: %d\n", RTMP_GetTime());
+//  33ms interval
   if (HI_SUCCESS != PUT_DATA(&stStream)) {
       free(stStream.pstPack);
       stStream.pstPack = NULL;

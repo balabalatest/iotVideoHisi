@@ -39,6 +39,7 @@
 								</option>
 								<option id="gnu.c.compiler.option.preprocessor.def.symbols.954701245" name="Defined symbols (-D)" superClass="gnu.c.compiler.option.preprocessor.def.symbols" useByScannerDiscovery="false" valueType="definedSymbols">
 									<listOptionValue builtIn="false" value="hi3518e"/>
+									<listOptionValue builtIn="false" value="NO_CRYPTO"/>
 									<listOptionValue builtIn="false" value="hi3518ev200"/>
 									<listOptionValue builtIn="false" value="ISP_V2"/>
 									<listOptionValue builtIn="false" value="HICHIP=0x3518E200"/>
@@ -76,9 +77,6 @@
 									<listOptionValue builtIn="false" value="&quot;${workspace_loc:/${ProjName}/hi3518/lib/lib_hiawb.a}&quot;"/>
 									<listOptionValue builtIn="false" value="&quot;${workspace_loc:/${ProjName}/hi3518/lib/lib_hiaf.a}&quot;"/>
 									<listOptionValue builtIn="false" value="&quot;${workspace_loc:/${ProjName}/hi3518/lib/lib_hidefog.a}&quot;"/>
-									<listOptionValue builtIn="false" value="&quot;${workspace_loc:/${ProjName}/hi3518/lib/libz.a}&quot;"/>
-									<listOptionValue builtIn="false" value="&quot;${workspace_loc:/${ProjName}/hi3518/lib/libssl.a}&quot;"/>
-									<listOptionValue builtIn="false" value="&quot;${workspace_loc:/${ProjName}/hi3518/lib/libcrypto.a}&quot;"/>
 								</option>
 								<inputType id="cdt.managedbuild.tool.gnu.c.linker.input.427801511" superClass="cdt.managedbuild.tool.gnu.c.linker.input">
 									<additionalInput kind="additionalinputdependency" paths="$(USER_OBJS)"/>
@@ -92,8 +90,8 @@
 							</tool>
 						</toolChain>
 					</folderInfo>
-					<fileInfo id="cdt.managedbuild.config.gnu.cross.exe.debug.736838353.97495440" name="sample_venc.c" rcbsApplicability="disable" resourcePath="src/sample_venc.c" toolsToInvoke="cdt.managedbuild.tool.gnu.cross.c.compiler.321778343.600816582">
-						<tool id="cdt.managedbuild.tool.gnu.cross.c.compiler.321778343.600816582" name="Cross GCC Compiler" superClass="cdt.managedbuild.tool.gnu.cross.c.compiler.321778343"/>
+					<fileInfo id="cdt.managedbuild.config.gnu.cross.exe.debug.736838353.393994187" name="sample_venc.c" rcbsApplicability="disable" resourcePath="src/sample_venc.c" toolsToInvoke="cdt.managedbuild.tool.gnu.cross.c.compiler.321778343.1959130671">
+						<tool id="cdt.managedbuild.tool.gnu.cross.c.compiler.321778343.1959130671" name="Cross GCC Compiler" superClass="cdt.managedbuild.tool.gnu.cross.c.compiler.321778343"/>
 					</fileInfo>
 					<sourceEntries>
 						<entry flags="VALUE_WORKSPACE_PATH|RESOLVED" kind="sourcePath" name="cJSON"/>

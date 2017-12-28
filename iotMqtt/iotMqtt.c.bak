@@ -1,49 +1,47 @@
-#include <MQTTClient.h>
 #include <pthread.h>
 
+#include "MQTTClient.h"
 #include "iotMqtt.h"
 
 
+static MQTTMessage* message = NULL;
 static int messageValid   = FAILURE;
-static char messageBuf[512];
 
 static unsigned char *txBuf = NULL;
 static unsigned char *rxBuf = NULL;
 
 static Network network;
 static MQTTClient client;
-static pthread_t pid;
 
-#define MIN(a,b) (((a)<(b))?(a):(b))
+static pthread_t pid;
 
 static void messageArrived(MessageData* md)
 {
   MQTTMessage* msg = md->message;
 
-//  printf("%.*s", (int)msg->payloadlen, (char*)msg->payload);
+  if (0)
+    printf("%.*s", (int)msg->payloadlen, (char*)msg->payload);
 
-  memcpy(messageBuf, msg->payload, MIN(msg->payloadlen, sizeof(messageBuf)-1));
-  messageBuf[msg->payloadlen] = 0;
-
+  message = md->message;
   messageValid = SUCCESS;
 }
 
-char* iotMqtt_GetMessage(void)
+MQTTMessage * iotMqtt_GetMessage(void)
 {
-  if ( messageValid != SUCCESS ) {
+  if ( (messageValid != SUCCESS) || !message ) {
     return NULL;
   }
 
   messageValid = FAILURE;
-  return messageBuf;
+  return message;
 }
 
-int iotMqtt_Init(void)
+int iotMqtt_Init()
 {
+  message = NULL;
   messageValid   = FAILURE;
   txBuf = NULL;
   rxBuf = NULL;
-  return 0;
 }
 
 int iotMqtt_Connect(const char *clientid, const char *username, const char *password, int txBufsize, int rxBufsize)
